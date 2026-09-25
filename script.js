@@ -106,6 +106,7 @@ async function submitScore() {
 
 // ---------- leaderboard ----------
 async function loadLeaderboard(size) {
+  state.screen = 'lb';
   state.lbSize = size;
   state.lbEntries = null;
   state.lbLoading = true;
