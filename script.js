@@ -15,12 +15,10 @@ function fmtTime(ms) {
   return m + ':' + String(rem).padStart(2, '0');
 }
 
-// ---------- puzzle logic ----------
 function newBoard(rows, cols) {
   const n = rows * cols;
   const arr = [...Array(n - 1).keys()].map(i => i + 1);
-  arr.push(0); // 0 = blank
-  // Shuffle via random valid moves from the solved state so it's always solvable.
+  arr.push(0);
   let blank = n - 1;
   const shuffleMoves = Math.max(80, n * 10);
   for (let i = 0; i < shuffleMoves; i++) {
@@ -75,13 +73,12 @@ function tapTile(idx) {
   render();
 }
 
-// ---------- image upload ----------
 function handleImageFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
     state.image = reader.result;
-    try { localStorage.setItem(IMAGE_KEY, state.image); } catch (e) { /* image may be too large for storage; ignore */ }
+    try { localStorage.setItem(IMAGE_KEY, state.image); } catch (e) {}
     render();
   };
   reader.readAsDataURL(file);
@@ -92,7 +89,6 @@ function removeImage() {
   render();
 }
 
-// ---------- screens ----------
 function screenHome() {
   let sizeButtons = '';
   for (let n = 2; n <= 10; n++) sizeButtons += `<button data-size="${n}">${n}\u00d7${n}</button>`;
@@ -167,7 +163,6 @@ function screenPuzzle() {
   `;
 }
 
-// ---------- render + event delegation ----------
 function render() {
   let html = '';
   if (state.screen === 'home') html = screenHome();
