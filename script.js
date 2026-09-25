@@ -1,7 +1,7 @@
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs
+  getFirestore, collection, addDoc, query, where, limit, getDocs
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 let db = null;
@@ -113,14 +113,18 @@ async function loadLeaderboard(size) {
   render();
   if (!db) { state.lbLoading = false; render(); return; }
   try {
+    // Filter only (no orderBy) so this doesn't need a Firestore composite
+    // index — sort by time in the browser instead.
     const q = query(
       collection(db, 'scores'),
       where('size', '==', size),
-      orderBy('timeMs', 'asc'),
-      limit(10)
+      limit(50)
     );
     const snap = await getDocs(q);
-    state.lbEntries = snap.docs.map(d => d.data());
+    state.lbEntries = snap.docs
+      .map(d => d.data())
+      .sort((a, b) => a.timeMs - b.timeMs)
+      .slice(0, 10);
   } catch (e) {
     console.warn('Could not load leaderboard:', e);
     state.lbEntries = [];
