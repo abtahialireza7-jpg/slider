@@ -1,0 +1,56 @@
+:root{
+  --bg:#f4f1ea; --panel:#ffffff; --ink:#2b2620; --muted:#7a7267;
+  --accent:#c15b3c; --accent-ink:#ffffff; --line:#e4ddd0; --tile:#fffaf2;
+  --tile-shadow: 0 2px 0 rgba(0,0,0,0.08);
+  --good:#3c7a4e;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#1b1814; --panel:#26221d; --ink:#f0e9dd; --muted:#a89d8d;
+    --accent:#e07a54; --accent-ink:#1b1814; --line:#3a342c; --tile:#332e26;
+    --good:#7fce97;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0; min-height:100%; background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+body{display:flex; flex-direction:column; align-items:center;}
+#app{ width:100%; max-width:520px; padding:24px 16px 40px; display:flex; flex-direction:column; gap:16px; margin:0 auto; }
+h1{font-size:1.4rem; margin:4px 0 0; text-align:center;}
+.sub{color:var(--muted); text-align:center; margin:0 0 4px; font-size:0.9rem;}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px;}
+.row{display:flex; gap:8px; flex-wrap:wrap; justify-content:center;}
+button{
+  font-family:inherit; border:none; border-radius:10px; padding:10px 14px;
+  background:var(--tile); color:var(--ink); cursor:pointer; font-size:0.95rem;
+  box-shadow:var(--tile-shadow); transition:transform .05s;
+}
+button:active{transform:scale(0.96);}
+.btn-accent{background:var(--accent); color:var(--accent-ink); font-weight:600;}
+.size-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+.size-grid button{padding:14px 6px; font-weight:600;}
+input[type=text],input[type=number]{
+  font-family:inherit; padding:10px 12px; border-radius:10px; border:1px solid var(--line);
+  background:var(--tile); color:var(--ink); font-size:1rem; width:100%;
+}
+label{font-size:0.85rem; color:var(--muted); display:block; margin-bottom:4px;}
+.field{flex:1; min-width:90px;}
+.statbar{display:flex; justify-content:space-between; align-items:center; font-size:0.95rem; color:var(--muted);}
+.statbar b{color:var(--ink); font-size:1.1rem;}
+#board{
+  display:grid; gap:5px; width:100%; margin:0 auto; max-width:420px;
+}
+.tile{
+  background:var(--tile); border-radius:8px; display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:clamp(0.8rem,4vw,1.4rem); box-shadow:var(--tile-shadow); cursor:pointer;
+  user-select:none;
+}
+.tile.blank{background:transparent; box-shadow:none; cursor:default;}
+.lbtable{width:100%; border-collapse:collapse; font-size:0.9rem;}
+.lbtable th,.lbtable td{padding:6px 8px; text-align:left; border-bottom:1px solid var(--line);}
+.lbtable th{color:var(--muted); font-weight:600; font-size:0.8rem;}
+.pill{display:inline-block; padding:2px 8px; border-radius:999px; background:var(--line); font-size:0.75rem; color:var(--muted);}
+.winbox{border:1px solid var(--good); color:var(--good); border-radius:10px; padding:10px; text-align:center; font-weight:600;}
+.top{display:flex; justify-content:space-between; align-items:center;}
+.linkbtn{background:none; box-shadow:none; color:var(--accent); font-weight:600; padding:4px;}
+.msg{color:var(--muted); font-size:0.85rem; text-align:center;}
