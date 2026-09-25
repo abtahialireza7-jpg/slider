@@ -1,7 +1,7 @@
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, query, where, limit, getDocs
+  getFirestore, collection, doc, setDoc, getDoc, query, where, limit, getDocs
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 let db = null;
@@ -9,11 +9,12 @@ try {
   const app = initializeApp(firebaseConfig);
   db = getFirestore(app);
 } catch (e) {
-  console.warn("Firebase not configured yet — leaderboards will be disabled.", e);
+  console.warn("Firebase not configured yet, leaderboards will be disabled.", e);
 }
 
 const app = document.getElementById('app');
 const NAME_KEY = 'sp_player_name';
+const PLAYER_KEY = 'sp_player_id';
 
 let state = {
   screen: localStorage.getItem(NAME_KEY) ? 'home' : 'name',
@@ -29,6 +30,18 @@ function fmtTime(ms) {
   const m = Math.floor(s / 60);
   const rem = s % 60;
   return m + ':' + String(rem).padStart(2, '0');
+}
+
+// Stable per-browser player id, separate from the display name, so a
+// leaderboard entry belongs to a person rather than to whatever name
+// string they last typed in.
+function playerId() {
+  let id = localStorage.getItem(PLAYER_KEY);
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : 'p' + Date.now() + Math.random().toString(36).slice(2));
+    localStorage.setItem(PLAYER_KEY, id);
+  }
+  return id;
 }
 
 // ---------- puzzle logic ----------
@@ -91,13 +104,22 @@ function tapTile(idx) {
   }
   render();
 }
+
+// Each player gets exactly one leaderboard row per size: the doc id is
+// derived from their player id + size, and we only overwrite it when the
+// new time actually beats the stored one. The same rule is enforced again
+// in firestore.rules so it can't be bypassed by writing to Firestore directly.
 async function submitScore() {
   if (!db) return;
   const name = localStorage.getItem(NAME_KEY) || 'Player';
   const size = sizeKey(state.rows, state.cols);
+  const pid = playerId();
+  const ref = doc(db, 'scores', pid + '_' + size);
   try {
-    await addDoc(collection(db, 'scores'), {
-      size, name, timeMs: state.elapsed, moves: state.moves, ts: Date.now()
+    const existing = await getDoc(ref);
+    if (existing.exists() && existing.data().timeMs <= state.elapsed) return;
+    await setDoc(ref, {
+      size, name, timeMs: state.elapsed, moves: state.moves, ts: Date.now(), playerId: pid
     });
   } catch (e) {
     console.warn('Could not save score:', e);
@@ -136,34 +158,35 @@ async function loadLeaderboard(size) {
 // ---------- screens ----------
 function screenName() {
   return `
-  <h1>🧩 Slider Puzzle</h1>
-  <p class="sub">What should we call you?</p>
-  <div class="card">
-    <input type="text" id="nameInput" placeholder="Your name" maxlength="20" autofocus>
-    <div style="height:10px"></div>
-    <button class="btn-accent" style="width:100%" id="startBtn">Start playing</button>
+  <h1>Slider</h1>
+  <p class="sub">Pick a name for the leaderboard.</p>
+  <div class="panel">
+    <input type="text" id="nameInput" placeholder="Name" maxlength="20" autofocus>
+    <button class="btn-accent full" id="startBtn">Continue</button>
   </div>`;
 }
 function screenHome() {
   const name = localStorage.getItem(NAME_KEY) || 'Player';
   let sizeButtons = '';
-  for (let n = 2; n <= 10; n++) sizeButtons += `<button data-size="${n}">${n}×${n}</button>`;
+  for (let n = 2; n <= 10; n++) sizeButtons += `<button data-size="${n}">${n}\u00d7${n}</button>`;
   return `
-  <h1>🧩 Slider Puzzle</h1>
-  <p class="sub">Hi, ${escapeHtml(name)} — pick a size</p>
-  <div class="card">
+  <div>
+    <h1>Slider</h1>
+    <p class="sub">Playing as ${escapeHtml(name)}</p>
+  </div>
+  <div class="panel">
+    <h2>Choose a size</h2>
     <div class="size-grid">${sizeButtons}</div>
   </div>
-  <div class="card">
-    <b>Custom level</b>
-    <div class="row" style="margin-top:10px">
+  <div class="panel">
+    <h2>Custom size</h2>
+    <div class="row">
       <div class="field"><label>Rows</label><input type="number" id="customRows" value="4" min="2" max="10"></div>
       <div class="field"><label>Columns</label><input type="number" id="customCols" value="3" min="2" max="10"></div>
     </div>
-    <div style="height:10px"></div>
-    <button class="btn-accent" style="width:100%" id="customBtn">Build & play</button>
+    <button class="btn-accent full" id="customBtn">Build puzzle</button>
   </div>
-  <button class="linkbtn" id="viewLbBtn">View leaderboards →</button>
+  <button class="linkbtn" id="viewLbBtn">Leaderboards</button>
   `;
 }
 function clampInt(v, lo, hi) { v = parseInt(v, 10); if (isNaN(v)) v = lo; return Math.max(lo, Math.min(hi, v)); }
@@ -176,36 +199,36 @@ function screenPuzzle() {
     else tiles += `<div class="tile" data-idx="${i}">${v}</div>`;
   });
   const win = state.won
-    ? `<div class="winbox">🎉 Solved in ${fmtTime(state.elapsed)} with ${state.moves} moves!</div>`
+    ? `<div class="winbox">Solved in ${fmtTime(state.elapsed)}, ${state.moves} moves.</div>`
     : '';
   return `
   <div class="top">
     <button class="linkbtn" id="backBtn">← Back</button>
-    <b>${rows}×${cols}</b>
-    <button id="reshuffleBtn">🔄 Reshuffle</button>
+    <h2>${rows}\u00d7${cols}</h2>
+    <button id="reshuffleBtn">New shuffle</button>
   </div>
-  <div class="statbar card">
-    <span>Time: <b id="timerVal">${fmtTime(state.elapsed)}</b></span>
-    <span>Moves: <b>${state.moves}</b></span>
+  <div class="statbar panel">
+    <span>Time <b id="timerVal">${fmtTime(state.elapsed)}</b></span>
+    <span>Moves <b>${state.moves}</b></span>
   </div>
   ${win}
   <div id="board" style="grid-template-columns:repeat(${cols},1fr); grid-template-rows:repeat(${rows},1fr); aspect-ratio:${cols}/${rows}">${tiles}</div>
-  ${state.won ? `<button class="btn-accent" style="width:100%" id="seeLbBtn">See leaderboard for ${rows}×${cols} →</button>` : ''}
+  ${state.won ? `<button class="btn-accent full" id="seeLbBtn">${rows}\u00d7${cols} leaderboard</button>` : ''}
   `;
 }
 function screenLeaderboard() {
   let sizeButtons = '';
   for (let n = 2; n <= 10; n++) {
     const active = state.lbSize === n + 'x' + n;
-    sizeButtons += `<button data-lbsize="${n}x${n}" style="${active ? 'background:var(--accent);color:var(--accent-ink)' : ''}">${n}×${n}</button>`;
+    sizeButtons += `<button data-lbsize="${n}x${n}" class="${active ? 'active' : ''}">${n}\u00d7${n}</button>`;
   }
   let body;
   if (!db) {
-    body = `<p class="msg">Leaderboards aren't configured yet — add your Firebase keys to firebase-config.js.</p>`;
+    body = `<p class="msg">Leaderboards need a Firebase connection. Add your project keys to firebase-config.js to turn them on.</p>`;
   } else if (state.lbLoading) {
-    body = `<p class="msg">Loading…</p>`;
+    body = `<p class="msg">Loading.</p>`;
   } else if (!state.lbEntries || state.lbEntries.length === 0) {
-    body = `<p class="msg">No times yet for ${state.lbSize} — be the first!</p>`;
+    body = `<p class="msg">No times recorded for ${state.lbSize} yet. Be the first.</p>`;
   } else {
     body = `<table class="lbtable"><thead><tr><th>#</th><th>Name</th><th>Time</th><th>Moves</th></tr></thead><tbody>`
       + state.lbEntries.map((e, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(e.name || 'Player')}</td><td>${fmtTime(e.timeMs)}</td><td>${e.moves}</td></tr>`).join('')
@@ -214,17 +237,17 @@ function screenLeaderboard() {
   return `
   <div class="top">
     <button class="linkbtn" id="backBtn">← Back</button>
-    <b>Leaderboards</b>
-    <span style="width:60px"></span>
+    <h2>Leaderboards</h2>
+    <span></span>
   </div>
-  <div class="card">
+  <div class="panel">
     <div class="size-grid">${sizeButtons}</div>
   </div>
-  <div class="card">
-    <p class="pill">${state.lbSize}</p>
+  <div class="panel">
+    <h2>${state.lbSize.replace('x', '\u00d7')}</h2>
     ${body}
   </div>
-  <p class="msg">Custom levels get ranked the same way — their leaderboard just isn't listed as a button here.</p>
+  <p class="msg">Custom sizes are ranked too. Solve one to see its board.</p>
   `;
 }
 
